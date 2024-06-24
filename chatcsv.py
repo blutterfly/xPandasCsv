@@ -1,6 +1,8 @@
 import os
 import sys
 import pandas as pd
+import duckdb
+from tabulate import tabulate
 
 def get_csv_from_args():
     if len(sys.argv) < 2:
@@ -20,15 +22,20 @@ def get_csv_from_args():
 
 def read_csv(csv_file):
     df = pd.read_csv(csv_file)
-    meta_head = df.head().to_dict()
-    meta_desc = df.describe().to_dict()
+    
+    # Replace 'bs_percentage' with 'bspct'
+    if 'bs_percentage' in df.columns:
+        df.rename(columns={'bs_percentage': 'bspct'}, inplace=True)
+    
+    meta_head = df.head()
+    meta_desc = df.describe()
     meta_cols = df.columns.to_list()
     meta_dtype = df.dtypes.to_dict()
 
     print("First 5 rows:")
-    print(meta_head)
+    print(tabulate(meta_head, headers='keys', tablefmt='plain'))
     print("\nDescription:")
-    print(meta_desc)
+    print(tabulate(meta_desc, headers='keys', tablefmt='plain'))
     print("\nColumns:")
     print(meta_cols)
     print("\nData Types:")
@@ -37,14 +44,17 @@ def read_csv(csv_file):
     return df
 
 def chat_csv(df):
-    print("\nEnter SQL-like commands to interact with the CSV file. Type 'exit' to quit.")
+    con = duckdb.connect(database=':memory:')
+    con.register('csv_table', df)
+    
+    print("\nEnter SQL commands to interact with the CSV file. Type 'exit' to quit.")
     while True:
         command = input(">>> ").strip()
         if command.lower() == 'exit':
             break
         try:
-            result = df.query(command)
-            print(result)
+            result = con.execute(command).df()
+            print(tabulate(result, headers='keys', tablefmt='plain'))
         except Exception as e:
             print(f"Error: {e}")
 
@@ -52,3 +62,4 @@ if __name__ == "__main__":
     csv_file = get_csv_from_args()
     df = read_csv(csv_file)
     chat_csv(df)
+&*
